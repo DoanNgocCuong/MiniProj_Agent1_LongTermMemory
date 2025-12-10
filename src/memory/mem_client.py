@@ -40,7 +40,7 @@ class MemoryInterface:
             if not message.get("content"):
                 messages[idx]["content"] = " "
 
-        return self.client.add(
+        return await self.client.add(
             messages, 
             user_id=user_id, 
             agent_id=agent_id, 
@@ -85,7 +85,7 @@ class MemoryInterface:
         Returns:
             List các SearchResult
         """
-        return self.client.search(
+        return await self.client.search(
             query, 
             user_id=user_id,
             # agent_id=agent_id,
@@ -120,7 +120,7 @@ class MemoryInterface:
         Returns:
             List các Memory objects
         """
-        result = self.client.get_all(
+        result = await self.client.get_all(
             user_id=user_id,
             run_id=run_id,
             page_size=page_size,

@@ -24,7 +24,18 @@ def api_error_handler(func):
     """Decorator to handle API errors consistently."""
 
     @wraps(func)
-    def wrapper(*args, **kwargs):
+    async def async_wrapper(*args, **kwargs):
+        try:
+            return await func(*args, **kwargs)
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error occurred: {e}")
+            raise APIError(f"API request failed: {e.response.text}")
+        except httpx.RequestError as e:
+            logger.error(f"Request error occurred: {e}")
+            raise APIError(f"Request failed: {str(e)}")
+    
+    @wraps(func)
+    def sync_wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
         except httpx.HTTPStatusError as e:
@@ -33,8 +44,11 @@ def api_error_handler(func):
         except httpx.RequestError as e:
             logger.error(f"Request error occurred: {e}")
             raise APIError(f"Request failed: {str(e)}")
-
-    return wrapper
+    
+    import inspect
+    if inspect.iscoroutinefunction(func):
+        return async_wrapper
+    return sync_wrapper
 
 
 class MemoryClient:
@@ -46,7 +60,7 @@ class MemoryClient:
     Attributes:
         api_key (str): The API key for authenticating with the Mem0 API.
         host (str): The base URL for the Mem0 API.
-        client (httpx.Client): The HTTP client used for making API requests.
+        client (httpx.AsyncClient): The HTTP client used for making API requests.
     """
 
     def __init__(self, api_key: Optional[str] = None, host: Optional[str] = None):
@@ -66,7 +80,7 @@ class MemoryClient:
         if not self.api_key:
             raise ValueError("API Key not provided. Please provide an API Key.")
 
-        self.client = httpx.Client(
+        self.client = httpx.AsyncClient(
             base_url=self.host,
             headers={"Authorization": f"Token {self.api_key}"},
             timeout=60,
@@ -74,18 +88,22 @@ class MemoryClient:
         # self._validate_api_key()
         capture_client_event("client.init", self)
 
-    def _validate_api_key(self):
+    async def _validate_api_key(self):
         """Validate the API key by making a test request."""
         try:
-            response = self.client.get("/memories/", params={"user_id": "test"})
+            response = await self.client.get("/memories/", params={"user_id": "test"})
             response.raise_for_status()
         except httpx.HTTPStatusError:
             raise ValueError(
                 "Invalid API Key. Please get a valid API Key from https://app.mem0.ai"
             )
+    
+    async def aclose(self):
+        """Close the async client."""
+        await self.client.aclose()
 
     @api_error_handler
-    def add(
+    async def add(
         self, messages: Union[str, List[Dict[str, str]]], **kwargs
     ) -> Dict[str, Any]:
         """Add a new memory.
@@ -101,7 +119,7 @@ class MemoryClient:
             APIError: If the API request fails.
         """
         payload = self._prepare_payload(messages, kwargs)
-        response = self.client.post("/memories/", json=payload)
+        response = await self.client.post("/memories/", json=payload)
         response.raise_for_status()
         capture_client_event("client.add", self)
         return response.json()
@@ -125,7 +143,7 @@ class MemoryClient:
         return response.json()
 
     @api_error_handler
-    def get_all(self, **kwargs) -> Dict[str, Any]:
+    async def get_all(self, **kwargs) -> Dict[str, Any]:
         """Retrieve all memories, with optional filtering.
 
         Args:
@@ -138,7 +156,7 @@ class MemoryClient:
             APIError: If the API request fails.
         """
         params = self._prepare_params(kwargs)
-        response = self.client.get("/memories/", params=params)
+        response = await self.client.get("/memories/", params=params)
         response.raise_for_status()
         capture_client_event(
             "client.get_all",
@@ -148,7 +166,7 @@ class MemoryClient:
         return response.json()
 
     @api_error_handler
-    def search(self, query: str, **kwargs) -> Dict[str, Any]:
+    async def search(self, query: str, **kwargs) -> Dict[str, Any]:
         """Search memories based on a query.
 
         Args:
@@ -163,7 +181,8 @@ class MemoryClient:
         """
         payload = {"query": query}
         payload.update({k: v for k, v in kwargs.items() if v is not None})
-        response = self.client.post("/memories/search/", json=payload)
+        logger.info(f"=======Search payload: {payload}")
+        response = await self.client.post("/memories/search/", json=payload)
         response.raise_for_status()
         capture_client_event("client.search", self, {"limit": kwargs.get("limit", 100)})
         return response.json()
