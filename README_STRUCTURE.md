@@ -83,3 +83,4 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 - **SOLID Principles**: Single responsibility, dependency inversion
 - **Clean Architecture**: Layers: API → Application → Domain ← Infrastructure
 
+

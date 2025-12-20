@@ -1,7 +1,9 @@
-1. # 1. Step 1: Research best practices Perflexity, Gemini, => Manus ra tài liệu All In One về Memory => Dùng nó để ra tài liệu cụ thể hơn cho dự án cần giải
-2. # 2. Step 2: Bài toán của mình + High Architect - Folder Structure - Data Flow + Source code zip + Template SDD => Mang vào Claude Ra SDD cho bài toán cần giải.
-3. # 3. Step 3: Mang ngược vào Manus để cho các giải pháp tối ưu hơn => Mang SDD + Phần SDD đã tối ưu vào Cursor gen code
-4. # 4. Check kết quả: Để nó tự code + Yêu cầu thêm:
+# Nhìn lại Quá trình 6h brainstorm và chuẩn bị giải pháp + 2h code full medium repo (ko theo Mem0 luôn -)))
+
+1. # 1. Step 1: Research best practices Perflexity, Gemini, => Manus ra tài liệu All In One về Memory => Dùng nó để ra tài liệu cụ thể hơn cho dự án cần giải  (4h hôm trước + 10h - 12h sáng 20/12)
+2. # 2. Step 2: Bài toán của mình + High Architect - Folder Structure - Data Flow + Source code zip + Template SDD => Mang vào Claude Ra SDD cho bài toán cần giải.   (Bấm nút và đợi)
+3. # 3. Step 3: Mang ngược vào Manus để cho các giải pháp tối ưu hơn => Mang SDD + Phần SDD đã tối ưu vào Cursor gen code  (Bấm và đợi)
+4. # 4. Check kết quả: Để nó tự code + Yêu cầu thêm: (1h-3h chiều)
 
 +, Viết file test
 +, Viết thêm pyproject.toml (có bug thì nhờ thằng Perflexity search cách fix xong import cho thằng Cursor nó check) (fix mãi fix mãi mới được)
