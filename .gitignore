@@ -1,13 +1,14 @@
-# Byte-compiled / optimized / DLL files
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
+env/
+venv/
+.venv/
+.locust_env
+ENV/
 build/
 develop-eggs/
 dist/
@@ -19,49 +20,38 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
-# PyInstaller
-*.manifest
-*.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints
-
-# Environment variables
+# Environment
 .env
-.env.*
+.env.local
+.env.*.local
 
-# IDEs / editors
+# IDE
 .vscode/
 .idea/
-*.sublime-project
-*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
 
 # Logs
 *.log
+logs/
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
+# Project specific
+*.zip
+.pika-mem0-enterprise/

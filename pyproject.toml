@@ -1,0 +1,92 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pika-mem0-enterprise"
+version = "1.0.0"
+description = "Self-hosted long-term memory system for PIKA robot"
+readme = "README_STRUCTURE.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "PIKA Team"}
+]
+keywords = ["memory", "ai", "fastapi", "vector-store", "graph-database"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Framework :: FastAPI",
+]
+
+# Core dependencies
+dependencies = [
+    # FastAPI and Web Server
+    "fastapi==0.109.0",
+    # Note: uvicorn upgraded to >=0.31.1 for mcp compatibility (if installed)
+    "uvicorn[standard]>=0.31.1,<0.40.0",
+    # Note: httpx upgraded to >=0.27.1 for mcp compatibility (if installed)
+    "httpx>=0.27.1,<0.28.0",
+    "python-dotenv==1.0.0",
+    # Pydantic
+    "pydantic>=2.0.0,<3.0.0",
+    "pydantic-settings>=2.0.0",
+    # Database
+    "asyncpg==0.29.0",
+    "sqlalchemy[asyncio]==2.0.25",
+    "alembic==1.13.1",
+    # Cache
+    "redis[hiredis]==5.0.1",
+    # Vector Store
+    # Note: pymilvus 2.3.4 requires grpcio<=1.58.0 which needs C++ compiler on Windows
+    # Using newer version that supports grpcio with pre-built wheels
+    "pymilvus>=2.3.4,<2.5.0",
+    # Fix: environs (pymilvus dependency) requires marshmallow<4.0.0
+    "marshmallow>=3.0.0,<4.0.0",
+    # Graph Database
+    "neo4j==5.15.0",
+    # OpenAI (upgraded to be compatible with mem0ai)
+    "openai>=1.90.0",
+]
+
+# Optional dependencies groups
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest==8.4.2",
+    "pytest-asyncio==0.23.5",
+    "pytest-cov==4.1.0",
+    "pytest-mock==3.14.0",
+]
+legacy = [
+    # Legacy mem0ai package (for src/ directory)
+    # Only install if needed for legacy code
+    "mem0ai==1.0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/pika-team/pika-mem0-enterprise"
+Documentation = "https://github.com/pika-team/pika-mem0-enterprise/docs"
+Repository = "https://github.com/pika-team/pika-mem0-enterprise"
+
+[tool.setuptools]
+packages = ["app", "mem0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+addopts = [
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "-v"
+]
+
