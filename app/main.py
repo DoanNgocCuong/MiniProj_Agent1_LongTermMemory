@@ -1,86 +1,46 @@
 """
-FastAPI Application Entry Point
-
-Creates and configures the FastAPI application with all routers, middleware,
-and lifecycle events.
+FastAPI application entry point.
+Initializes app, middleware, and routes.
 """
-
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.core.logging import setup_logging
-from app.api.v1.router import api_router
-from app.infrastructure.db.connection import db
-from app.infrastructure.db.session import init_db
-from app.infrastructure.cache.client import cache
-from app.infrastructure.search.milvus_client import milvus_client
-from app.infrastructure.external.neo4j_client import neo4j_client
+from app.core.logging import setup_logging, get_logger
+from app.api.v1.router import router as v1_router
+from app.middleware.logging_middleware import LoggingMiddleware
+from app.middleware.error_handler import exception_handler
+from app.infrastructure.database.postgres_session import init_db, close_db
+from app.infrastructure.cache.l1_redis_cache import get_l1_cache
+from app.infrastructure.cache.l2_materialized_view import L2MaterializedView
+from app.infrastructure.database.postgres_session import get_db_session
 
-# Setup structured logging
-logger = setup_logging()
+# Setup logging
+setup_logging(level="INFO" if not settings.DEBUG else "DEBUG", json_format=True)
+logger = get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application lifespan events
-    
-    - Startup: Initialize database connections, cache, etc.
-    - Shutdown: Close connections, cleanup resources
-    """
+    """Application lifespan events."""
     # Startup
-    logger.info("Starting PIKA Memory System...")
+    logger.info("Starting PIKA Memory System API...")
     
     try:
-        # Initialize database connections
-        await db.connect()
-        logger.info("Database connected")
+        # Initialize database
+        await init_db()
         
-        # Auto-create tables if enabled and they don't exist
-        if settings.AUTO_CREATE_TABLES:
-            try:
-                await init_db()
-            except Exception as e:
-                logger.warning(f"Failed to auto-create tables (they may already exist): {e}")
-                # Don't fail startup if tables already exist
+        # Initialize L2 materialized view table
+        async for db_session in get_db_session():
+            await L2MaterializedView.create_table(db_session)
+            break
         
-        # Initialize cache (optional)
-        try:
-            await cache.connect()
-            logger.info("Cache connected")
-        except Exception as e:
-            if settings.REDIS_REQUIRED:
-                logger.error(f"Redis is required but connection failed: {e}")
-                raise
-            else:
-                logger.warning(f"Redis connection failed (optional): {e}")
+        # Connect to Redis
+        l1_cache = await get_l1_cache()
+        logger.info("L1 Redis cache connected")
         
-        # Initialize Milvus
-        try:
-            await milvus_client.connect()
-            logger.info("Milvus connected")
-        except Exception as e:
-            if settings.MILVUS_REQUIRED:
-                logger.error(f"Milvus is required but connection failed: {e}")
-                raise
-            else:
-                logger.warning(f"Milvus connection failed (optional): {e}")
-        
-        # Initialize Neo4j
-        try:
-            await neo4j_client.connect()
-            logger.info("Neo4j connected")
-        except Exception as e:
-            if settings.NEO4J_REQUIRED:
-                logger.error(f"Neo4j is required but connection failed: {e}")
-                raise
-            else:
-                logger.warning(f"Neo4j connection failed (optional): {e}")
-        
-        logger.info("PIKA Memory System started successfully")
-        
+        logger.info("Application startup completed")
     except Exception as e:
         logger.error(f"Error during startup: {e}")
         raise
@@ -88,46 +48,71 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("Shutting down PIKA Memory System...")
+    logger.info("Shutting down PIKA Memory System API...")
     
     try:
-        await db.disconnect()
-        await cache.disconnect()
-        await milvus_client.disconnect()
-        await neo4j_client.disconnect()
-        logger.info("All connections closed")
+        # Disconnect from Redis
+        l1_cache = await get_l1_cache()
+        await l1_cache.disconnect()
+        
+        # Close database connections
+        await close_db()
+        
+        logger.info("Application shutdown completed")
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")
 
 
 # Create FastAPI app
 app = FastAPI(
-    title="PIKA Memory API",
-    description="Self-hosted long-term memory system for PIKA robot",
-    version="1.0.0",
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description="PIKA Memory System - Self-hosted Mem0 implementation",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
 )
 
 # Add CORS middleware
+# Parse CORS_ORIGINS - support both string and list
+import json
+cors_origins = settings.CORS_ORIGINS
+if isinstance(cors_origins, str):
+    try:
+        # Try parsing as JSON array
+        cors_origins = json.loads(cors_origins)
+    except (json.JSONDecodeError, ValueError):
+        # If not JSON, treat as comma-separated string
+        cors_origins = [origin.strip() for origin in cors_origins.split(",")] if cors_origins else ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins if isinstance(cors_origins, list) else [cors_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include API routers
-app.include_router(api_router, prefix="/api")
+# Add logging middleware
+app.add_middleware(LoggingMiddleware)
+
+# Add exception handlers
+app.add_exception_handler(Exception, exception_handler)
+
+# Include routers
+app.include_router(v1_router, prefix=settings.API_V1_PREFIX)
 
 
-@app.get("/")
+@app.get("/health", tags=["health"])
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "version": settings.APP_VERSION}
+
+
+@app.get("/", tags=["root"])
 async def root():
-    """Root endpoint"""
+    """Root endpoint."""
     return {
-        "name": "PIKA Memory API",
-        "version": "1.0.0",
-        "status": "healthy"
+        "name": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "docs": "/docs",
     }
+

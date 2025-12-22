@@ -1,74 +1,60 @@
 """
-Custom Exceptions
-
-Domain-agnostic exceptions for the application.
+Custom exceptions for the application.
+Follows SOLID principles with specific exception types.
 """
 
-from typing import Optional, Dict, Any
+
+class PIKAMemoryException(Exception):
+    """Base exception for all PIKA Memory System errors."""
+    pass
 
 
-class AppException(Exception):
-    """Base application exception"""
-    
-    def __init__(
-        self,
-        message: str,
-        status_code: int = 500,
-        details: Optional[Dict[str, Any]] = None
-    ):
-        self.message = message
-        self.status_code = status_code
-        self.details = details or {}
-        super().__init__(self.message)
+class MemoryNotFoundError(PIKAMemoryException):
+    """Raised when a memory is not found."""
+    pass
 
 
-class ValidationError(AppException):
-    """Input validation error"""
-    
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
-        super().__init__(message, status_code=400, details=details)
+class JobNotFoundError(PIKAMemoryException):
+    """Raised when a job is not found."""
+    pass
 
 
-class NotFoundError(AppException):
-    """Resource not found error"""
-    
-    def __init__(self, resource: str, identifier: str):
-        message = f"{resource} with id '{identifier}' not found"
-        super().__init__(message, status_code=404)
+class CacheError(PIKAMemoryException):
+    """Raised when cache operations fail."""
+    pass
 
 
-class UnauthorizedError(AppException):
-    """Authentication/Authorization error"""
-    
-    def __init__(self, message: str = "Unauthorized"):
-        super().__init__(message, status_code=401)
+class RepositoryError(PIKAMemoryException):
+    """Raised when repository operations fail."""
+    pass
 
 
-class ForbiddenError(AppException):
-    """Permission denied error"""
-    
-    def __init__(self, message: str = "Forbidden"):
-        super().__init__(message, status_code=403)
+class ServiceError(PIKAMemoryException):
+    """Raised when service operations fail."""
+    pass
 
 
-class RateLimitError(AppException):
-    """Rate limit exceeded error"""
-    
-    def __init__(self, message: str = "Rate limit exceeded"):
-        super().__init__(message, status_code=429)
+class ValidationError(PIKAMemoryException):
+    """Raised when input validation fails."""
+    pass
 
 
-class InternalServerError(AppException):
-    """Internal server error"""
-    
-    def __init__(self, message: str = "Internal server error"):
-        super().__init__(message, status_code=500)
+class ExternalServiceError(PIKAMemoryException):
+    """Raised when external service calls fail."""
+    pass
 
 
-class ServiceUnavailableError(AppException):
-    """External service unavailable"""
-    
-    def __init__(self, service: str, message: Optional[str] = None):
-        msg = message or f"Service '{service}' is currently unavailable"
-        super().__init__(msg, status_code=503)
+class Mem0Error(ExternalServiceError):
+    """Raised when Mem0 API calls fail."""
+    pass
+
+
+class DatabaseError(RepositoryError):
+    """Raised when database operations fail."""
+    pass
+
+
+class MessageQueueError(PIKAMemoryException):
+    """Raised when message queue operations fail."""
+    pass
 

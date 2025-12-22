@@ -1,1 +1,0 @@
-"""Search Infrastructure (Vector Stores)"""

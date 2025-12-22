@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import asyncio
 
 # Import domain entities
-from app.domains.memory.domain.entities import Fact
+from app.domains.memory.domain.entities import Memory
 from datetime import datetime
 
 
@@ -23,33 +23,29 @@ def event_loop():
 
 
 @pytest.fixture
-def sample_fact() -> Fact:
-    """Sample fact entity for testing"""
-    return Fact(
-        id="test-fact-1",
+def sample_memory() -> Memory:
+    """Sample memory entity for testing"""
+    return Memory(
+        id="test-memory-1",
         user_id="test-user-1",
         content="User loves playing tennis on weekends",
-        category="preference",
-        confidence=0.9,
-        entities=["tennis", "weekends"],
         embedding=[0.1] * 1536,  # Mock embedding vector
         created_at=datetime.utcnow(),
-        metadata={"conversation_id": "conv-1"}
+        metadata={"conversation_id": "conv-1", "categories": ["preference"]}
     )
 
 
 @pytest.fixture
-def sample_facts() -> list[Fact]:
-    """Multiple sample facts for testing"""
+def sample_memories() -> list[Memory]:
+    """Multiple sample memories for testing"""
     return [
-        Fact(
-            id=f"test-fact-{i}",
+        Memory(
+            id=f"test-memory-{i}",
             user_id="test-user-1",
-            content=f"Sample fact content {i}",
-            category="preference",
-            confidence=0.8 + (i * 0.02),
+            content=f"Sample memory content {i}",
             embedding=[0.1 * i] * 1536,
             created_at=datetime.utcnow(),
+            metadata={"categories": ["preference"]}
         )
         for i in range(5)
     ]

@@ -1,171 +1,212 @@
 """
-Configuration Management
-
-Uses Pydantic BaseSettings for environment variable management
-with type validation and auto-completion.
+Core configuration module using Pydantic Settings.
+Loads configuration from environment variables with validation.
 """
-
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator, Field, computed_field
-from typing import List, Optional
+from pydantic_settings import BaseSettings
+from pydantic import field_validator, model_validator
+from typing import Optional, Union
+import json
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables"""
+    """Application settings loaded from environment variables."""
     
     # Application
-    APP_NAME: str = "PIKA Memory API"
+    APP_NAME: str = "PIKA Memory System"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
-    ENVIRONMENT: str = "production"
+    ENVIRONMENT: str = "development"
+    # Toggle to decide extraction mode:
+    # - True: use async worker + RabbitMQ (default, production)
+    # - False: run extract_facts inline in API process (for debugging worker issues)
+    USE_ASYNC_WORKER_FOR_EXTRACTION: bool = True
     
     # API
     API_V1_PREFIX: str = "/api/v1"
-    # Store as string to prevent auto JSON parsing, then convert to list via property
-    CORS_ORIGINS_STR: str = Field(default="*", validation_alias="CORS_ORIGINS")
+    CORS_ORIGINS: Union[str, list[str]] = ["*"]
     
-    @field_validator("CORS_ORIGINS_STR", mode="before")
+    @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def parse_cors_origins_str(cls, v):
-        """Parse CORS_ORIGINS from env (supports comma-separated or JSON)"""
-        # If None or empty, return default
-        if not v or (isinstance(v, str) and not v.strip()):
-            return "*"
-        
-        # If already a list (shouldn't happen but handle it)
+    def parse_cors_origins(cls, v):
+        """Parse CORS_ORIGINS from string (JSON or comma-separated) to list."""
         if isinstance(v, list):
-            return ",".join(str(origin) for origin in v)
-        
-        # Must be a string
-        if not isinstance(v, str):
-            return "*"
-        
-        return v.strip()
+            return v
+        if isinstance(v, str):
+            # Try JSON first
+            if v.strip().startswith("["):
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    pass
+            # Fallback to comma-separated
+            if "," in v:
+                return [origin.strip() for origin in v.split(",") if origin.strip()]
+            # Single value
+            return [v.strip()] if v.strip() else ["*"]
+        return ["*"]
     
-    @property
-    def CORS_ORIGINS(self) -> List[str]:
-        """Get CORS origins as list"""
-        v = self.CORS_ORIGINS_STR
-        
-        # Handle single asterisk
-        if v == "*":
-            return ["*"]
-        
-        # Try JSON first
-        try:
-            import json
-            parsed = json.loads(v)
-            if isinstance(parsed, list):
-                return [str(origin) for origin in parsed if origin]
-        except (json.JSONDecodeError, ValueError):
-            pass
-        
-        # Fallback to comma-separated
-        origins = [origin.strip() for origin in v.split(",") if origin.strip()]
-        return origins if origins else ["*"]
-    
-    # Database - PostgreSQL
+    # PostgreSQL
+    POSTGRES_USER: Optional[str] = None
+    POSTGRES_PASSWORD: str = ""
+    POSTGRES_DB: str = ""
     POSTGRES_HOST: str = "localhost"
     POSTGRES_PORT: int = 5432
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "postgres"
-    POSTGRES_DB: str = "pika_mem0"
-    POSTGRES_URL: str = ""
+    POSTGRES_POOL_SIZE: int = 10
+    POSTGRES_MAX_OVERFLOW: int = 20
+    
+    @model_validator(mode="before")
+    @classmethod
+    def map_postgres_username(cls, data: dict) -> dict:
+        """Map POSTGRES_USERNAME to POSTGRES_USER if needed."""
+        if isinstance(data, dict):
+            # Handle POSTGRES_USERNAME from .env
+            if "POSTGRES_USERNAME" in data and not data.get("POSTGRES_USER"):
+                data["POSTGRES_USER"] = data["POSTGRES_USERNAME"]
+        return data
     
     @property
-    def database_url(self) -> str:
-        """Construct PostgreSQL connection URL"""
-        if self.POSTGRES_URL:
-            return self.POSTGRES_URL
+    def DATABASE_URL(self) -> str:
+        """Construct PostgreSQL database URL."""
+        if not self.POSTGRES_USER:
+            raise ValueError("POSTGRES_USER or POSTGRES_USERNAME must be set")
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
-    # Milvus (Vector Store)
-    MILVUS_HOST: str = "124.197.21.40"
-    MILVUS_PORT: int = 19530  # Default Milvus gRPC port (8000 is HTTP API port)
-    MILVUS_COLLECTION_NAME: str = "user_facts"
-    MILVUS_USER: Optional[str] = None  # Milvus username (if authentication required)
-    MILVUS_PASSWORD: Optional[str] = None  # Milvus password (if authentication required)
-    MILVUS_TIMEOUT: int = 30  # Connection timeout in seconds (increased for slow networks)
-    
-    # Neo4j (Graph Store)
-    NEO4J_URI: str = "bolt://124.197.21.40:8687"
-    NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "mem0graph"
-    
-    # Redis (Cache)
+    # Redis
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
-    REDIS_PASSWORD: Optional[str] = None  # Redis password (if required)
-    REDIS_USERNAME: Optional[str] = None  # Redis username (optional, for Redis 6+ ACL)
-    REDIS_URL: Optional[str] = None  # Full Redis URL (overrides individual settings)
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_MAX_CONNECTIONS: int = 50
+    
+    # RabbitMQ
+    RABBITMQ_HOST: str = "localhost"
+    RABBITMQ_PORT: int = 5672
+    RABBITMQ_DEFAULT_USER: str = "guest"
+    RABBITMQ_DEFAULT_PASS: str = "guest"
+    # Support alternative naming
+    RABBITMQ_USERNAME: Optional[str] = None
+    RABBITMQ_PASSWORD: Optional[str] = None
+    RABBITMQ_VHOST: str = "/"
+    RABBITMQ_EXTRACTION_QUEUE: str = "memory_extraction"
+    RABBITMQ_EXCHANGE: Optional[str] = None
+    RABBITMQ_QUEUE: Optional[str] = None
+    RABBITMQ_PREFETCH_COUNT: int = 1
+    NUMBER_WORKER_RABBITMQ: int = 5
     
     @property
-    def redis_url(self) -> str:
-        """Construct Redis connection URL with optional authentication"""
-        if self.REDIS_URL:
-            return self.REDIS_URL
-        
-        # Build URL with authentication if provided
-        if self.REDIS_PASSWORD:
-            if self.REDIS_USERNAME:
-                # Format: redis://username:password@host:port/db
-                return f"redis://{self.REDIS_USERNAME}:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-            else:
-                # Format: redis://:password@host:port/db
-                return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
-        else:
-            # No password: redis://host:port/db
-            return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+    def RABBITMQ_USER(self) -> str:
+        """Get RabbitMQ username, preferring RABBITMQ_USERNAME over RABBITMQ_DEFAULT_USER."""
+        return self.RABBITMQ_USERNAME or self.RABBITMQ_DEFAULT_USER
     
-    # OpenAI API
-    OPENAI_API_KEY: str = ""
-    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    @property
+    def RABBITMQ_PASS(self) -> str:
+        """Get RabbitMQ password, preferring RABBITMQ_PASSWORD over RABBITMQ_DEFAULT_PASS."""
+        return self.RABBITMQ_PASSWORD or self.RABBITMQ_DEFAULT_PASS
+    
+    @property
+    def RABBITMQ_QUEUE_NAME(self) -> str:
+        """Get RabbitMQ queue name, preferring RABBITMQ_QUEUE over RABBITMQ_EXTRACTION_QUEUE."""
+        return self.RABBITMQ_QUEUE or self.RABBITMQ_EXTRACTION_QUEUE
+    
+    # Mem0 OSS Configuration (không cần API key)
+    MEM0_USE_OSS: bool = True  # Set to False để dùng Enterprise API
+    
+    # Mem0 Enterprise API (chỉ dùng khi MEM0_USE_OSS=False)
+    MEM0_API_KEY: Optional[str] = None
+    MEM0_ORG_ID: Optional[str] = None
+    MEM0_PROJECT_ID: Optional[str] = None
+    
+    # Mem0 OSS - Vector Store Configuration
+    MEM0_VECTOR_STORE_PROVIDER: str = "milvus"  # Options: qdrant, chroma, pgvector, milvus
+    MEM0_VECTOR_STORE_COLLECTION_NAME: str = "pika_memories"
+    MEM0_VECTOR_STORE_HOST: str = "localhost"
+    MEM0_VECTOR_STORE_PORT: int = 6333  # Qdrant default (19530 for Milvus)
+    # Generic vector store overrides / credentials
+    # For providers that use a single URL (e.g. Milvus url="http://host:port" or "./milvus.db")
+    MEM0_VECTOR_STORE_URL: Optional[str] = None
+    # For Milvus production mode (token = "user:password")
+    MEM0_VECTOR_STORE_USER: Optional[str] = None
+    MEM0_VECTOR_STORE_PASSWORD: Optional[str] = None
+    
+    # Mem0 OSS - LLM Configuration
+    MEM0_LLM_PROVIDER: str = "openai"  # Options: openai, ollama, litellm, groq, together
+    MEM0_LLM_MODEL: str = "gpt-4o-mini"
+    MEM0_LLM_API_KEY: Optional[str] = None  # Will use OPENAI_API_KEY if not set
+    
+    # Mem0 OSS - Embedder Configuration
+    MEM0_EMBEDDER_PROVIDER: str = "openai"  # Options: openai, huggingface, ollama, azure_openai
+    MEM0_EMBEDDER_MODEL: str = "text-embedding-3-small"
+    MEM0_EMBEDDER_API_KEY: Optional[str] = None  # Will use OPENAI_API_KEY if not set
+    
+    # Mem0 OSS - Graph Store (optional, for v1.1)
+    MEM0_GRAPH_STORE_ENABLED: bool = False
+    MEM0_GRAPH_STORE_PROVIDER: str = "neo4j"
+    # v1.1 được recommend trong docs mới, hỗ trợ tốt hơn cho Milvus/graph
+    MEM0_VERSION: str = "v1.1"
+    
+    # Mem0 OSS - History Database
+    MEM0_HISTORY_DB_PATH: Optional[str] = None  # Default: ~/.mem0/history.db
+    
+    # OpenAI (for embeddings)
+    OPENAI_API_KEY: Optional[str] = None
     OPENAI_LLM_MODEL: str = "gpt-4o-mini"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     
-    # Security
-    API_KEY_SECRET: str = ""  # For API key hashing
-    JWT_SECRET: str = ""  # If needed for admin panel
-    ENCRYPTION_KEY: str = ""  # For data encryption at rest
+    # Vector Store (Milvus/Qdrant)
+    MILVUS_HOST: str = "localhost"
+    MILVUS_PORT: int = 19530
+    MILVUS_COLLECTION_NAME: str = "pika_memories"
+    QDRANT_HOST: str = "localhost"
+    QDRANT_PORT: int = 6333
+    
+    # Neo4j
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "neo4j"
+    
+    # Caching Configuration
+    CACHE_L0_ENABLED: bool = True
+    CACHE_L0_TTL: int = 0  # Request lifetime
+    
+    CACHE_L1_ENABLED: bool = True
+    CACHE_L1_TTL: int = 3600  # 1 hour
+    CACHE_L1_KEY_PREFIX: str = "search"
+    
+    CACHE_L2_ENABLED: bool = True
+    CACHE_L2_TTL: int = 86400  # 24 hours
+    
+    CACHE_L3_ENABLED: bool = True
+    CACHE_L3_TTL: int = 86400  # 24 hours (embedding cache)
+    CACHE_L3_KEY_PREFIX: str = "embedding"
+    
+    # Proactive Caching
+    PROACTIVE_CACHE_ENABLED: bool = True
+    PROACTIVE_CACHE_INTERVAL_SECONDS: int = 1800  # 30 minutes
+    PROACTIVE_CACHE_USER_FAVORITE_QUERY: str = "user favorite (movie, character, pet, activity, friend, music, travel, toy)"
+    
+    # Job Configuration
+    JOB_TIMEOUT_SECONDS: int = 300  # 5 minutes
+    JOB_MAX_RETRIES: int = 3
     
     # Performance
     MAX_CONCURRENT_REQUESTS: int = 100
-    REQUEST_TIMEOUT: int = 30
+    REQUEST_TIMEOUT_SECONDS: int = 30
     
-    # Search Optimization
-    USE_HYBRID_SEARCH: bool = True  # Enable hybrid search (vector + keyword)
-    HYBRID_VECTOR_WEIGHT: float = 0.7  # Weight for vector search (0.0-1.0)
-    HYBRID_KEYWORD_WEIGHT: float = 0.3  # Weight for keyword search (0.0-1.0)
-    USE_GPU_ACCELERATION: bool = False  # Enable GPU acceleration for Milvus (requires GPU)
+    # STM (Short-Term Memory) Configuration
+    STM_TIER1_MAX_TURNS: int = 10  # Active window
+    STM_TIER2_SUMMARY_TURNS: int = 40  # Turns to accumulate before summarizing into tier2
+    STM_TIER3_SUMMARY_TURNS: int = 200  # Turns before promoting tier2 summary into tier3
+    STM_REDIS_TTL_SECONDS: int = 3600  # TTL for STM conversation state in Redis
     
-    # Logging
-    LOG_LEVEL: str = "INFO"
-    LOG_FORMAT: str = "json"  # json or text
+    # Monitoring
+    ENABLE_METRICS: bool = True
+    METRICS_PORT: int = 9090
     
-    # Database Auto-Initialization
-    AUTO_CREATE_DB: bool = True  # Auto-create database if it doesn't exist
-    AUTO_CREATE_TABLES: bool = True  # Auto-create tables on startup if they don't exist
-    
-    # Optional Services (skip if unavailable)
-    REDIS_REQUIRED: bool = False  # If False, app will continue even if Redis is unavailable
-    MILVUS_REQUIRED: bool = True  # If False, app will continue even if Milvus is unavailable
-    NEO4J_REQUIRED: bool = True  # If False, app will continue even if Neo4j is unavailable
-    
-    # Legacy/Docker variables (not used by Settings but may exist in .env)
-    # These are ignored to avoid validation errors
-    WORKERS: Optional[str] = None  # Used by docker-compose.yml for uvicorn workers
-    MEM0_API_KEY: Optional[str] = None  # Legacy mem0ai package
-    MEM0_ORG_ID: Optional[str] = None  # Legacy mem0ai package
-    MEM0_PROJECT_ID: Optional[str] = None  # Legacy mem0ai package
-    
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        # Don't auto-parse JSON for complex types, let validator handle it
-        env_parse_none_str="",
-        # Allow extra fields from .env that we don't use
-        extra="ignore",
-    )
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = True
+        extra = "ignore"  # Ignore extra fields in .env (like POSTGRES_USERNAME, API_KEY_SECRET, etc.)
 
 
 # Global settings instance

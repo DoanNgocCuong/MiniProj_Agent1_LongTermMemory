@@ -24,6 +24,8 @@ TcpTestSucceeded : True
 PingSucceeded : True
 ```
 
+
+
 WEB_CONCURRENCY=4 \
 gunicorn app.server:app \
   -w 4 \
@@ -33,7 +35,14 @@ gunicorn app.server:app \
   --log-level info
 
 # Run Worker
-python -m deploy.worker_tools
+# Cách 1: Chạy từ root directory (khuyến nghị)
+python -m workers.main
+
+# Cách 2: Dùng script helper
+python scripts/run_worker.py
+
+# Lưu ý: Worker cần RabbitMQ đang chạy để consume jobs
+# Nếu RabbitMQ chưa chạy, job vẫn được tạo trong DB nhưng không được process
 
 
 # 3. Test API
@@ -161,3 +170,29 @@ curl -X POST "http://localhost:300  31/api/v1/search_facts" \
     }
 }
 
+
+
+---
+
+
+
+### Cách dễ nhất (không cần viết script)
+
+Vì bạn đã có UI Milvus ở `http://124.197.21.40:8000`, cách **nhẹ nhất** là dùng GUI để **Load collection**:
+
+1. Mở trình duyệt vào:
+   - `http://124.197.21.40:8000` (Attu / Milvus UI).
+2. Chọn:
+   - Database: `default`.
+   - Collection: đúng tên bạn đang dùng trong `.env`:
+     ```env
+     MEM0_VECTOR_STORE_PROVIDER=milvus
+     MEM0_VECTOR_STORE_COLLECTION_NAME=???   # tên này
+     ```
+3. Trong UI, ở màn collection đó:
+   - Tìm nút **Load** / **Load Collection** / icon tải (tuỳ version UI).
+   - Bấm **Load** cho collection đó.
+4. Khi trạng thái collection chuyển sang **Loaded**:
+   - Gửi lại `/api/v1/extract_facts` → lỗi `collection not loaded[...]` sẽ biến mất (nếu host/port đã đúng 19530 như hiện tại).
+
+Không cần Python script, không cần telnet – chỉ cần 1 lần click “Load” trên đúng collection trong UI Milvus.

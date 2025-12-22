@@ -1,19 +1,13 @@
 """
-API v1 Router
-
-Aggregates all v1 endpoints into a single router.
+API v1 router - aggregates all v1 endpoints.
 """
-
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import extract, search, health, precompute
+from app.api.v1.endpoints import memory, jobs
 
+# Note: prefix is added in main.py (settings.API_V1_PREFIX = "/api/v1")
+# So we don't add prefix here to avoid double prefix
+router = APIRouter()
 
-api_router = APIRouter(prefix="/v1", tags=["v1"])
-
-# Include all endpoint routers
-api_router.include_router(extract.router, prefix="/extract_facts", tags=["memory"])
-api_router.include_router(search.router, prefix="/search_facts", tags=["memory"])
-api_router.include_router(precompute.router, prefix="/precompute", tags=["optimization"])
-api_router.include_router(health.router, prefix="/health", tags=["health"])
-
+router.include_router(memory.router, tags=["memory"])
+router.include_router(jobs.router, tags=["jobs"])
