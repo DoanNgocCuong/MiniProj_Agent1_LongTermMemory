@@ -230,9 +230,14 @@ class RabbitMQService:
                 logger.error(f"Error processing message: {error_msg}")
                 
                 # Check if this is a permanent error (should not requeue)
+                # NOTE:
+                # - "Permanent processing error" and event loop issues are already treated as permanent
+                # - "Job not found" means the job record does not exist in DB and will not appear later,
+                #   so requeuing would create an infinite retry loop ⇒ treat as permanent as well.
                 is_permanent_error = (
-                    "Permanent processing error" in error_msg or
-                    "attached to a different loop" in error_msg
+                    "Permanent processing error" in error_msg
+                    or "attached to a different loop" in error_msg
+                    or "Job not found" in error_msg
                 )
                 
                 # Reject message
