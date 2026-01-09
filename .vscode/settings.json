@@ -1,0 +1,51 @@
+{
+    // --- DỌN DẸP GIAO DIỆN (UI CLEANUP) ---
+    
+    // 1. Tắt các tab của GitLens (Giảm tải cho Sidebar)
+    "gitlens.plusFeatures.enabled": false,     // Tắt các tính năng Pro/Cloud/Quảng cáo
+    "gitlens.showWelcomeOnInstall": false,
+    "gitlens.showComingSoon": false,
+    "gitlens.views.fileHistory.enabled": false,
+    "gitlens.views.compareAndMerge.enabled": false,
+    "gitlens.views.searchAndCompare.enabled": false,
+    "gitlens.views.remotes.enabled": false,
+    "gitlens.views.branches.enabled": false,
+    "gitlens.views.tags.enabled": false,
+    "gitlens.views.stashes.enabled": false,
+    "gitlens.views.contributors.enabled": false,
+    "gitlens.views.home.enabled": false,
+    "gitlens.views.workspaces.enabled": false,
+    "gitlens.views.graph.enabled": false,
+    "gitlens.views.graphDetails.enabled": false,
+    "gitlens.views.inspect.enabled": false,
+    "gitlens.views.launchpad.enabled": false,
+    "gitlens.views.timeline.enabled": false,
+    "gitlens.codeLens.enabled": false,         // Tắt "You, 2 days ago" trên code
+
+    // 2. Tắt các View của Docker (Chỉ bật khi thực sự dùng Docker)
+    "docker.explorer.detailsView.enabled": false,
+    "docker.views.containers.enabled": false,
+    "docker.views.images.enabled": false,
+    "docker.views.registries.enabled": false,
+    "docker.views.networks.enabled": false,
+    "docker.views.volumes.enabled": false,
+    "docker.views.help.enabled": false,
+
+    // 3. Tắt các thành phần phụ từ các Extension khác (nếu bạn có cài)
+    "bookmarks.baseDirectory": "",             // Một số cấu hình giúp Bookmarks gọn hơn
+    "bookmarks.showLabels": "none",
+    "timeline.excludeSources": ["*"],          // Tắt Timeline mặc định
+
+    // 4. Explorer & UI (Thanh bên trái)
+    "explorer.openEditors.visible": 1,         // Chỉ hiện 1 dòng cho Open Editors
+    "explorer.compactFolders": true,           // Gộp folder con (ví dụ: src/main/java)
+    "outline.showElements": true,
+    
+    // 5. Editor (Soạn thảo sạch sẽ)
+    "workbench.startupEditor": "none",
+    "editor.minimap.enabled": false,           // Tắt cái minimap bên phải
+    "editor.stickyScroll.enabled": true,       // Giữ lại cái này (cực kỳ hữu ích)
+    "workbench.tips.enabled": false,
+    "editor.occurrenceHighlight": "off",       // Tắt highlight từ giống nhau nếu thấy rối
+    "editor.renderWhitespace": "none"          // Tắt các dấu chấm khoảng trắng
+}
